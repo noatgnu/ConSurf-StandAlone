@@ -1,2 +1,10 @@
 data
 .deb
+.idea/ConSurf-StandAlone.iml
+.idea/inspectionProfiles/profiles_settings.xml
+.idea/misc.xml
+.idea/modules.xml
+.idea/vcs.xml
+stand_alone_consurf/__pycache__/GENERAL_CONSTANTS.cpython-312.pyc
+stand_alone_consurf/__pycache__/GENERAL_CONSTANTS.cpython-38.pyc
+ucsf-chimerax_1.6.1ubuntu20.04_amd64.deb
