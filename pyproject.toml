@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "consurf-standalone"
+version = "0.1.0"
+description = ""
+authors = ["Toan Phung <toan.phung@proteo.info>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+biopython = "^1.81"
+requests = "^2.31.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
