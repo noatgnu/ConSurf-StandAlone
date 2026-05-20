@@ -1,5 +1,6 @@
 
 import traceback
+import sys
 
 
 import GENERAL_CONSTANTS
@@ -10,7 +11,7 @@ import shutil
 import Bio
 import subprocess
 import time
-import fpdf 
+import fpdf
 import math
 import argparse
 
@@ -3974,9 +3975,16 @@ def pairwise_alignment(first_seq, second_seq, clustalw_aln = "", seq_type = ""):
     #[first_seq_with_gaps, middle_line, second_seq_with_gaps] = (str(alignments[0])).split() # old Bio
     alignment_string = str(alignments[0])
     lines = alignment_string.split('\n')
-    first_seq_with_gaps = lines[0]
-    middle_line = lines[1]
-    second_seq_with_gaps = lines[2]
+    first_seq_with_gaps = ""
+    middle_line = ""
+    second_seq_with_gaps = ""
+    for block_idx in range(0, len(lines), 4):
+        if block_idx < len(lines):
+            first_seq_with_gaps += lines[block_idx]
+        if block_idx + 1 < len(lines):
+            middle_line += lines[block_idx + 1]
+        if block_idx + 2 < len(lines):
+            second_seq_with_gaps += lines[block_idx + 2]
 
     matches = 0
     length_without_gaps = 0
@@ -4066,19 +4074,26 @@ def pairwise_alignment_old(first_seq, second_seq, clustalw_aln = "", seq_type = 
     #[first_seq_with_gaps, middle_line, second_seq_with_gaps] = (str(alignments[0])).split() # old Bio
     alignment_string = str(alignments[0])
     lines = alignment_string.split('\n')
-    first_seq_with_gaps = lines[0]
-    middle_line = lines[1]
-    second_seq_with_gaps = lines[2]  
-	
+    first_seq_with_gaps = ""
+    middle_line = ""
+    second_seq_with_gaps = ""
+    for block_idx in range(0, len(lines), 4):
+        if block_idx < len(lines):
+            first_seq_with_gaps += lines[block_idx]
+        if block_idx + 1 < len(lines):
+            middle_line += lines[block_idx + 1]
+        if block_idx + 2 < len(lines):
+            second_seq_with_gaps += lines[block_idx + 2]
+
     matches = 0
     length_without_gaps = 0
     for i in range(len(first_seq_with_gaps)):
-	
+
         if first_seq_with_gaps[i] != '-' and second_seq_with_gaps[i] != '-':
-		
+
             length_without_gaps += 1
             if first_seq_with_gaps[i] == second_seq_with_gaps[i]:
-		
+
                 matches += 1
 
     identity = (matches * 100.0) / length_without_gaps
@@ -5296,10 +5311,10 @@ def run_rate4site():
 
     params = "rate4site -a '%s' -s %s -zn %s -bn -o %s -v 9" %(vars['query_string'], vars['msa_fasta'], MatrixHash[(form['SUB_MATRIX']).upper()], vars['r4s_out'])
     if vars['running_mode'] == "_mode_pdb_msa_tree" or vars['running_mode'] == "_mode_msa_tree":
-        params.replace(vars['query_string'], form['msa_SEQNAME'])
+        params = params.replace(vars['query_string'], form['msa_SEQNAME'])
         params += " -t %s" %vars['tree_file']
     if vars['running_mode'] == "_mode_pdb_msa":
-        params.replace(vars['query_string'], form['msa_SEQNAME'])
+        params = params.replace(vars['query_string'], form['msa_SEQNAME'])
     if form['ALGORITHM'] == "Bayes":
 
         params +=  " -ib"
@@ -5343,10 +5358,10 @@ def run_rate4site_old():
 
     params = " -a '%s' -s %s -zn %s -bn -o %s" %(vars['query_string'], vars['msa_fasta'], MatrixHash[(form['SUB_MATRIX']).upper()], vars['r4s_out'])
     if vars['running_mode'] == "_mode_pdb_msa_tree" or vars['running_mode'] == "_mode_msa_tree":
-        params.replace(vars['query_string'], form['msa_SEQNAME'])
+        params = params.replace(vars['query_string'], form['msa_SEQNAME'])
         params += " -t %s" %vars['tree_file']
     if vars['running_mode'] == "_mode_pdb_msa":
-        params.replace(vars['query_string'], form['msa_SEQNAME'])
+        params = params.replace(vars['query_string'], form['msa_SEQNAME'])
     if form['ALGORITHM'] == "Bayes":
 
         params += " -ib -n 32 -v 9" 
@@ -5528,7 +5543,7 @@ def create_MSA():
 
     elif form['MSAprogram'] == "MUSCLE":
 
-        cmd = "muscle -align %s -output %s" %(vars['FINAL_sequences'], vars['msa_fasta'])
+        cmd = "muscle -in %s -out %s" %(vars['FINAL_sequences'], vars['msa_fasta'])
         LOG.write("create_MSA : run %s\n" %cmd)
         submit_job_to_Q("MUSCLE", cmd)
         #convert_msa_format(vars['msa_clustal'], "clustal", vars['msa_fasta'], "fasta")
@@ -5733,8 +5748,7 @@ def run_search(Search_Out_File):
 
 
 def submit_job_to_Q(job_name_prefix, cmd):
-
-    process = subprocess.Popen(cmd, shell=True)
+    process = subprocess.Popen("stdbuf -oL -eL " + cmd, shell=True)
     process.communicate()
 
     
@@ -6177,6 +6191,9 @@ try:
     ## mode :  include msa and pdb
 
     elif vars['running_mode'] == "_mode_pdb_msa" or vars['running_mode'] == "_mode_pdb_msa_tree":
+
+        if vars.get('MSA_query_seq'):
+            vars['protein_seq_string'] = vars['MSA_query_seq']
 
         compare_atom_seqres_or_msa("MSA")
 

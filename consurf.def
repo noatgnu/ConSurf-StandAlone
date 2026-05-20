@@ -1,0 +1,100 @@
+Bootstrap: docker
+From: python:3.10-bookworm
+
+%environment
+    export PYTHONDONTWRITEBYTECODE=1
+    export PYTHONUNBUFFERED=1
+    export PATH="/opt/miniconda/bin:$PATH"
+    export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
+    export OMPI_ALLOW_RUN_AS_ROOT=1
+    export JAVA_TOOL_OPTIONS="-Dfile.encoding=UTF-8"
+    export PROTTEST_HOME="/prottest3"
+
+%files
+    ucsf-chimerax_1.11.1ubuntu22.04_amd64.deb /ucsf-chimerax_1.11.1ubuntu22.04_amd64.deb
+
+%post
+    apt-get update && apt-get install -y \
+        unzip \
+        python3 \
+        python3-pip \
+        cd-hit \
+        ncbi-blast+ \
+        hmmer \
+        mafft \
+        clustalw \
+        wget \
+        build-essential \
+        phyml \
+        git \
+        ant
+
+    mkdir muscle_src && \
+        wget -q https://www.drive5.com/muscle/muscle_src_3.8.1551.tar.gz && \
+        tar -xzf muscle_src_3.8.1551.tar.gz -C muscle_src && \
+        cd muscle_src && make && \
+        mv muscle /usr/local/bin/ && \
+        cd / && rm -rf muscle_src muscle_src_3.8.1551.tar.gz
+
+    git clone https://github.com/ddarriba/prottest3.git
+    sed -i 's|statsFile = new File(workAlignment + STATS_FILE_SUFFIX + "txt")|statsFile = new File(workAlignment + STATS_FILE_SUFFIX + ".txt")|g' prottest3/src/main/java/es/uvigo/darwin/prottest/exe/PhyMLv3AminoAcidRunEstimator.java
+    sed -i 's|treeFile = new File(workAlignment + TREE_FILE_SUFFIX + "txt")|treeFile = new File(workAlignment + TREE_FILE_SUFFIX + ".txt")|g' prottest3/src/main/java/es/uvigo/darwin/prottest/exe/PhyMLv3AminoAcidRunEstimator.java
+
+    cd prottest3
+    ant jar
+    echo '#!/bin/bash\njava -jar /prottest3/dist/prottest-3.4.2.jar "$@"' > /prottest3/dist/prottest.sh
+    chmod +x /prottest3/dist/prottest.sh
+    ln -s /prottest3/dist/prottest.sh /usr/bin/prottest
+
+    cd /
+    ln -s /usr/bin/phyml /prottest3/dist/bin/PhyML_3.0_linux64
+
+    mkdir -p /opt/conda
+    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /opt/conda/miniconda.sh
+    bash /opt/conda/miniconda.sh -b -p /opt/miniconda
+    . /opt/miniconda/bin/activate
+    conda init bash
+    conda create -n consurf_env python=3.10 -y && \
+        echo "conda activate consurf_env" >> ~/.bashrc
+
+    source ~/.bashrc
+    conda init bash
+    /opt/miniconda/bin/conda run -n consurf_env pip3 install fpdf
+    /opt/miniconda/bin/conda run -n consurf_env conda install biopython
+    /opt/miniconda/bin/conda run -n consurf_env conda install -c conda-forge -c bioconda mmseqs2
+
+    wget https://github.com/ddarriba/jmodeltest2/files/157117/jmodeltest-2.1.10.tar.gz && \
+        tar -xvzf jmodeltest-2.1.10.tar.gz && \
+        chmod +x jmodeltest-2.1.10/exe/phyml/PhyML_3.0_linux64 && \
+        rm jmodeltest-2.1.10.tar.gz
+
+    echo "JMODELTEST2 = \"/jmodeltest-2.1.10/jModelTest.jar\"" > GENERAL_CONSTANTS.py
+
+    wget https://www.fontsquirrel.com/fonts/download/dejavu-sans -O DejaVuSans.zip && \
+        unzip DejaVuSans.zip && \
+        mv DejaVuSans.ttf /usr/share/fonts/ && \
+        rm DejaVuSans.zip
+    echo "FONTS = \"/usr/share/fonts/DejaVuSans.ttf\"" >> GENERAL_CONSTANTS.py
+
+    wget https://github.com/ariloytynoja/prank-msa/archive/refs/heads/master.zip -O prank.zip && \
+        unzip prank.zip && \
+        cd prank-msa-master/src && make && \
+        chmod +x prank && \
+        mv prank /usr/local/bin/ && \
+        cd ../.. && rm -rf prank-msa-master prank.zip
+
+    apt-get install ./ucsf-chimerax_1.11.1ubuntu22.04_amd64.deb -y
+
+    /opt/miniconda/bin/conda run -n consurf_env conda install -c conda-forge -c schrodinger pymol-bundle
+
+    mkdir -p /workspace/stand_alone_consurf
+    cp -r /workspace/stand_alone_consurf /workspace/stand_alone_consurf
+    cd /workspace/stand_alone_consurf
+    sed -i 's|prottest -log disabled -i %s -AICC -o %s -S 1 -JTT -LG -MtREV -Dayhoff -WAG -CpREV -threads 1|prottest -log disabled -i %s -AICC -o %s -S 1 -JTT -LG -MtREV -Dayhoff -WAG -CpREV -threads 2|g' stand_alone_consurf.py
+    sed -i 's|/bentallab/programs/stand_alone_consurf/prank-msa-master/src|/usr/local/bin/prank|g' GENERAL_CONSTANTS.py
+    sed -i 's|/bentallab/programs/dejavu-fonts-ttf-2.37/ttf/DejaVuSans.ttf|/usr/share/fonts/DejaVuSans.ttf|g' GENERAL_CONSTANTS.py
+    sed -i 's|mafft --localpair --maxiterate 1000 --quiet|mafft --localpair --maxiterate 1000 --quiet --thread 5|g' stand_alone_consurf.py
+    sed -i 's|jackhmmer --notextw -N %s --domE %s -E %s --incE %s --cpu 4|jackhmmer --notextw -N %s --domE %s -E %s --incE %s --cpu 20|g' stand_alone_consurf.py
+
+%runscript
+    exec /bin/bash
